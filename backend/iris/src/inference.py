@@ -11,52 +11,9 @@ class InferenceBackend(ABC):
     async def describe_frame(self, frame: bytes, prompt: str) -> str:
         raise NotImplementedError("This is an abstract method that must be implemented")
 
-
-# Implementation of inference using OpenAI GPT-3.5 as the inference model
-class GPTBackend(InferenceBackend):
-    def __init__(self) -> None:
-        self.api_key = os.getenv("OPENAI_KEY")
-
-        if not self.api_key:
-            raise ValueError("OPENAI_KEY is missing in the .env file")
-
-        self.model = "gpt-3.5-turbo"
-
-    async def describe_frame(self, frame: bytes, prompt: str) -> str:
-        encoded_frame = base64.b64encode(frame).decode("utf-8")
-        full_prompt = f"{prompt}\n\nHere is the image (base64 encoded): data:image/jpeg;base64,{encoded_frame}"
-
-        message_list = [
-            {
-                "role": "user",
-                "content": full_prompt,
-            }
-        ]
-
-        data = {
-            "model": self.model,
-            "messages": message_list,
-            "max_tokens": 50,
-            "temperature": 0.3,
-        }
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions", headers=headers, json=data
-            )
-
-        if response.status_code != 200:
-            raise ValueError(
-                f"Request failed with status code {response.status_code}: {response.text}"
-            )
-
-        response_data = response.json()
-        return response_data["choices"][0]["message"]["content"]
+    @abstractmethod
+    async def is_hazard(self, frame: bytes, prompt: str) -> bool:
+        raise NotImplementedError("This is an abstract method that must be implemented")
 
 
 # Implementation of inference using Anthropic Claude as the inference model
@@ -107,6 +64,52 @@ class ClaudeBackend(InferenceBackend):
 
         response_data = response.json()
         return response_data["content"][0]["text"]
+
+    async def is_hazard(self, frame: bytes, prompt: str) -> bool:
+        encoded_frame = base64.b64encode(frame).decode("utf-8")
+
+        message_list = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": encoded_frame,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+
+        data = {"model": self.model, "max_tokens": 1, "messages": message_list}
+
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages", headers=headers, json=data
+            )
+
+        if response.status_code != 200:
+            raise ValueError(f"Request failed with status code {response.status_code}")
+
+        response_data = response.json()
+        result = response_data["content"][0]["text"].strip().lower()
+
+        if result == "yes":
+            return True
+        elif result == "no":
+            return False
+        else:
+            raise ValueError("Unexpected response from model: '{result}'")
 
 
 # Implementation of inference using Deepmind Gemini as the inference model
@@ -211,3 +214,51 @@ class GeminiBackend(InferenceBackend):
             text_content = response_data["candidates"][0]["content"]["parts"][0]["text"]
 
         return text_content
+
+    async def is_hazard(self, frame: bytes, prompt: str) -> bool:
+        file_uri = await self.upload_image(frame)
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "file_data": {
+                                "mime_type": "image/jpeg",
+                                "file_uri": file_uri,
+                            }
+                        },
+                    ]
+                }
+            ],
+            "max_tokens": 1,
+        }
+
+        async with httpx.AsyncClient() as client:
+            generate_response = await client.post(
+                f"{self.generate_url}?key={self.api_key}", headers=headers, json=payload
+            )
+
+            if generate_response.status_code != 200:
+                raise ValueError(
+                    f"Content generation failed with status code {generate_response.status_code}"
+                )
+
+            response_data = generate_response.json()
+            result = (
+                response_data["candidates"][0]["content"]["parts"][0]["text"]
+                .strip()
+                .lower()
+            )
+
+        if result == "yes":
+            return True
+        elif result == "no":
+            return False
+        else:
+            raise ValueError("Unexpected response from model: '{result}'")

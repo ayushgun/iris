@@ -1,8 +1,6 @@
 import asyncio
 import websockets
-
 import caption
-from inference import GeminiBackend
 
 
 async def receive_frames(websocket):
@@ -10,8 +8,8 @@ async def receive_frames(websocket):
         try:
             frame = await websocket.recv()
 
-            if isinstance(frame, bytes):
-                description = await caption.describe_frame(frame, backend=GeminiBackend)
+            if isinstance(frame, bytes) and await caption.is_hazardous_frame(frame):
+                description = await caption.describe_frame(frame)
                 await websocket.send(description)
 
         except websockets.ConnectionClosed as e:

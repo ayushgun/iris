@@ -1,0 +1,4 @@
+{
+    "describe_prompt": "Act as if you are guiding a blind person walking. Speak directly to them in second person, describing this image in two sentences. Focus only on key details for your safety and navigation. Avoid assumptions or irrelevant details—do not comment on sounds. Do not mention yourself in any way. Respond in English with clear, friendly guidance.",
+    "hazard_prompt": "Based on this image, is there any immediate hazard for someone walking? Answer with a simple 'yes' or 'no'."
+}
