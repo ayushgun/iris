@@ -4,4 +4,9 @@ version = "0.1.0"
 description = "Backend which does object classification and scene description + extrapolation"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "anthropic>=0.37.1",
+    "httpx>=0.27.2",
+    "python-dotenv>=1.0.1",
+    "websockets>=13.1",
+]
