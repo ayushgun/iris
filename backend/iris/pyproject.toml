@@ -1,0 +1,7 @@
+[project]
+name = "iris"
+version = "0.1.0"
+description = "Backend which does object classification and scene description + extrapolation"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
