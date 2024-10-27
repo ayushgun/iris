@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import caption
+from inference import GeminiBackend
 
 
 async def receive_frames(websocket):
@@ -8,15 +9,20 @@ async def receive_frames(websocket):
         try:
             frame = await websocket.recv()
 
-            if isinstance(frame, bytes) and await caption.is_hazardous_frame(frame):
-                description = await caption.describe_frame(frame)
-                await websocket.send(description)
+            if isinstance(frame, bytes):
+                is_hazard, description = await asyncio.gather(
+                    caption.is_hazardous_frame(frame, backend=GeminiBackend),
+                    caption.describe_frame(frame, backend=GeminiBackend),
+                )
+
+                if is_hazard:
+                    await websocket.send(description)
 
         except websockets.ConnectionClosed as e:
             print(f"Connection closed: {e}")
             break
 
 
-start_server = websockets.serve(receive_frames, "localhost", 8000)
+start_server = websockets.serve(receive_frames, "10.91.29.98", 8000)
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

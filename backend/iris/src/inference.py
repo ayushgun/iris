@@ -236,7 +236,11 @@ class GeminiBackend(InferenceBackend):
                     ]
                 }
             ],
-            "max_tokens": 1,
+            "generation_config": {
+                "maxOutputTokens": 3,
+                "responseMimeType": "application/json",
+                "responseSchema": {"type": "BOOLEAN"},
+            },
         }
 
         async with httpx.AsyncClient() as client:
@@ -250,15 +254,15 @@ class GeminiBackend(InferenceBackend):
                 )
 
             response_data = generate_response.json()
-            result = (
-                response_data["candidates"][0]["content"]["parts"][0]["text"]
-                .strip()
-                .lower()
-            )
 
-        if result == "yes":
-            return True
-        elif result == "no":
-            return False
-        else:
-            raise ValueError("Unexpected response from model: '{result}'")
+            # Extract the response text safely, handle cases where the structure might not be as expected
+            try:
+                result = bool(
+                    response_data["candidates"][0]["content"]["parts"][0]["text"]
+                )
+            except (KeyError, IndexError) as e:
+                raise ValueError(
+                    f"Unexpected response structure: {response_data}"
+                ) from e
+
+            return result
