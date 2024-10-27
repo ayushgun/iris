@@ -46,7 +46,7 @@ class ClaudeBackend(InferenceBackend):
             }
         ]
 
-        data = {"model": self.model, "max_tokens": 50, "messages": message_list}
+        data = {"model": self.model, "max_tokens": 25, "messages": message_list}
 
         headers = {
             "x-api-key": self.api_key,
@@ -197,7 +197,10 @@ class GeminiBackend(InferenceBackend):
                         },
                     ]
                 }
-            ]
+            ],
+            "generation_config": {
+                "maxOutputTokens": 25,
+            },
         }
 
         async with httpx.AsyncClient() as client:
@@ -211,6 +214,9 @@ class GeminiBackend(InferenceBackend):
                 )
 
             response_data = generate_response.json()
+
+            print(response_data)
+
             text_content = response_data["candidates"][0]["content"]["parts"][0]["text"]
 
         return text_content
@@ -254,6 +260,8 @@ class GeminiBackend(InferenceBackend):
                 )
 
             response_data = generate_response.json()
+
+            print(response_data)
 
             # Extract the response text safely, handle cases where the structure might not be as expected
             try:
